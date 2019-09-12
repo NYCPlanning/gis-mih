@@ -70,7 +70,7 @@ try:
     # Setting config path
 
     config = ConfigParser.ConfigParser()
-    config.read(r'G:\SCRIPTS\MIH_Distribution\ini\MIH_config.ini')
+    config.read(r'mih_config_sample.ini')
 
     # Setting log path
 
