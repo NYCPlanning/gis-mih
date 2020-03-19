@@ -2,73 +2,72 @@ import os, arcpy, datetime, sys, zipfile, shutil, xml.etree.ElementTree as ET, C
 
 # Define function for removing geoprocessing and local storage information.
 
+
+def remove_geoprocess_lcl_storage(src, date):
+    arcdir = arcpy.GetInstallInfo("desktop")["InstallDir"]
+    xslt_remove_geoprocessing = arcdir + "Metadata/Stylesheets/gpTools/remove geoprocessing history.xslt"
+    xslt_remove_local_storage = arcdir + "Metadata/Stylesheets/gpTools/remove local storage info.xslt"
+    arcpy.XSLTransform_conversion(src, xslt_remove_geoprocessing, r"C:\temp\{}.xml".format(src.split("\\")[-1]))
+    tree = ET.parse(r"C:\temp\{}.xml".format(src.split("\\")[-1]))
+    root = tree.getroot()
+    for pubdate in root.iter('pubDate'):
+        print("Previous publication date - {}".format(pubdate.text))
+        print("Setting publication date to - {}".format(date))
+        pubdate.text = date
+    for pubdate in root.iter('pubdate'):
+        print("Previous publication date - {}".format(pubdate.text))
+        print("Setting publication date to - {}".format(date))
+        pubdate.text = date
+    for summary_date in root.iter('idPurp'):
+        if 'Last Update:' in summary_date.text:
+            summary_date.text = summary_date.text.replace(prev_city_council_date, city_council_date)
+        else:
+            summary_date.text = summary_date.text.replace(prev_city_council_date, city_council_date)
+    for title in root.iter('title'):
+        print("Updating FGDC metadata title to - {}".format(date))
+        title.text = "MIH_{}".format(date)
+    for metd in root.iter('metd'):
+        print("Updating FGDC metadata date to - {}".format(date))
+        metd.text = date
+    tree.write(r"C:\temp\{}.xml".format(src.split("\\")[-1]))
+    arcpy.MetadataImporter_conversion(r"C:\temp\{}.xml".format(src.split("\\")[-1]), src)
+    arcpy.XSLTransform_conversion(src, xslt_remove_local_storage, r"C:\temp\{}.xml".format(src.split("\\")[-1]))
+    arcpy.MetadataImporter_conversion(r"C:\temp\{}.xml".format(src.split("\\")[-1]), src)
+
+# Define function for updating publication date within XML.
+
+def update_xml_meta(src, date):
+    print("Copying old metadata xml to new directory and updating publication date")
+    old_metadata_dir = os.path.join(old_export_dir, 'meta')
+    print("Copying {}".format(src))
+    shutil.copyfile(os.path.join(old_metadata_dir, src), os.path.join(export_directory_meta, src))
+    print("Copy complete")
+    print("Editing xml publication date")
+    tree = ET.parse(os.path.join(export_directory_meta, src))
+    root = tree.getroot()
+    for pubdate in root.iter('pubDate'):
+        print("Previous publication date - {}".format(pubdate.text))
+        print("Setting publication date to - {}".format(date))
+        pubdate.text = date
+    for summary_date in root.iter('idPurp'):
+        if '2/28/19' in summary_date.text:
+            print("Previous summary - {}".format(summary_date.text))
+            summary_preview = summary_date.text.replace('2/13/2019', city_council_date)
+            summary_preview = summary_preview.replace('2/28/19', str(datetime.datetime.strftime(publication_datetime, '%#m/%#d/%Y')))
+            summary_date.text = summary_preview
+            print("Setting summary to - {}".format(summary_date.text))
+        else:
+            print("Previous summary - {}".format(summary_date.text))
+            summary_preview = summary_date.text.replace('2/13/2019', city_council_date)
+            summary_date.text = summary_preview
+            print("Setting summary to - {}".format(summary_date.text))
+    tree.write(os.path.join(export_directory_meta, "{}_new.xml".format(src.split('.')[0])))
+    os.remove(os.path.join(export_directory_meta, src))
+    os.rename(os.path.join(export_directory_meta, "{}_new.xml".format(src.split('.')[0])),
+              os.path.join(export_directory_meta, src))
+
 try:
-    def remove_geoprocess_lcl_storage(src, date):
-        arcdir = arcpy.GetInstallInfo("desktop")["InstallDir"]
-        xslt_remove_geoprocessing = arcdir + "Metadata/Stylesheets/gpTools/remove geoprocessing history.xslt"
-        xslt_remove_local_storage = arcdir + "Metadata/Stylesheets/gpTools/remove local storage info.xslt"
-        arcpy.XSLTransform_conversion(src, xslt_remove_geoprocessing, r"C:\temp\{}.xml".format(src.split("\\")[-1]))
-        tree = ET.parse(r"C:\temp\{}.xml".format(src.split("\\")[-1]))
-        root = tree.getroot()
-        for pubdate in root.iter('pubDate'):
-            print("Previous publication date - {}".format(pubdate.text))
-            print("Setting publication date to - {}".format(date))
-            pubdate.text = date
-        for pubdate in root.iter('pubdate'):
-            print("Previous publication date - {}".format(pubdate.text))
-            print("Setting publication date to - {}".format(date))
-            pubdate.text = date
-        for summary_date in root.iter('idPurp'):
-            if 'Last Update:' in summary_date.text:
-                summary_date.text = summary_date.text.replace(prev_city_council_date, city_council_date)
-            else:
-                summary_date.text = summary_date.text.replace(prev_city_council_date, city_council_date)
-        for title in root.iter('title'):
-            print("Updating FGDC metadata title to - {}".format(date))
-            title.text = "MIH_{}".format(date)
-        for metd in root.iter('metd'):
-            print("Updating FGDC metadata date to - {}".format(date))
-            metd.text = date
-        tree.write(r"C:\temp\{}.xml".format(src.split("\\")[-1]))
-        arcpy.MetadataImporter_conversion(r"C:\temp\{}.xml".format(src.split("\\")[-1]), src)
-        arcpy.XSLTransform_conversion(src, xslt_remove_local_storage, r"C:\temp\{}.xml".format(src.split("\\")[-1]))
-        arcpy.MetadataImporter_conversion(r"C:\temp\{}.xml".format(src.split("\\")[-1]), src)
-
-    # Define function for updating publication date within XML.
-
-    def update_xml_meta(src, date):
-        old_export_dir = r"M:\GIS\BytesProduction\MIH\2019\20190329"
-        print("Copying old metadata xml to new directory and updating publication date")
-        old_metadata_dir = os.path.join(old_export_dir, 'meta')
-        print("Copying {}".format(src))
-        shutil.copyfile(os.path.join(old_metadata_dir, src), os.path.join(export_directory_meta, src))
-        print("Copy complete")
-        print("Editing xml publication date")
-        tree = ET.parse(os.path.join(export_directory_meta, src))
-        root = tree.getroot()
-        for pubdate in root.iter('pubDate'):
-            print("Previous publication date - {}".format(pubdate.text))
-            print("Setting publication date to - {}".format(date))
-            pubdate.text = date
-        for summary_date in root.iter('idPurp'):
-            if '2/28/19' in summary_date.text:
-                print("Previous summary - {}".format(summary_date.text))
-                summary_preview = summary_date.text.replace('2/13/2019', city_council_date)
-                summary_preview = summary_preview.replace('2/28/19', str(datetime.datetime.strftime(publication_datetime, '%#m/%#d/%Y')))
-                summary_date.text = summary_preview
-                print("Setting summary to - {}".format(summary_date.text))
-            else:
-                print("Previous summary - {}".format(summary_date.text))
-                summary_preview = summary_date.text.replace('2/13/2019', city_council_date)
-                summary_date.text = summary_preview
-                print("Setting summary to - {}".format(summary_date.text))
-        tree.write(os.path.join(export_directory_meta, "{}_new.xml".format(src.split('.')[0])))
-        os.remove(os.path.join(export_directory_meta, src))
-        os.rename(os.path.join(export_directory_meta, "{}_new.xml".format(src.split('.')[0])),
-                  os.path.join(export_directory_meta, src))
-
     # Setting config path
-
     config = ConfigParser.ConfigParser()
     config.read(r'mih_config_sample.ini')
 
@@ -348,7 +347,7 @@ try:
 
     dup_block_list = []
 
-    # Write resulting join attribute information to csv table
+    # Write non-duplicate blocks to CSV table
 
     with open(os.path.join(output_blocklist_path, "MIH_BlockList_{}.csv".format(publication_date)),
               'w') as mihFile:
@@ -358,13 +357,38 @@ try:
             for row in cursor:
                 boro = str(row.getValue('BORO'))
                 block = str(row.getValue('BLOCK'))
-                if block in dup_block_list:
+                boro_block_concat = "{}_{}".format(boro, block)
+                if boro_block_concat in dup_block_list:
                     print("Skipping dup block val - {}".format(block))
                 else:
                     writer.writerow([boro, block])
-                    dup_block_list.append(block)
+                    dup_block_list.append(boro_block_concat)
         except Exception as e:
-            raise (e)
+            raise e
+
+    # # Write duplicate blocks to CSV table
+    #
+    # cursor = arcpy.SearchCursor(join_output_path, ['BORO', 'BLOCK'])
+    #
+    # dup_block_list = []
+    #
+    # with open(os.path.join(output_blocklist_path, 'MIH_BlockList_Dups_{}.csv'.format(publication_date)),
+    #           'w') as mihDupFile:
+    #     writer = csv.writer(mihDupFile, lineterminator='\n')
+    #     writer.writerow(['BORO', 'BLOCK'])
+    #     try:
+    #         for row in cursor:
+    #             boro = str(row.getValue('BORO'))
+    #             block = str(row.getValue('BLOCK'))
+    #             boro_block_concat = "{}_{}".format(boro, block)
+    #             if boro_block_concat in dup_block_list:
+    #                 print("DupBlock hit. Writing to CSV")
+    #                 writer.writerow([boro, block])
+    #             else:
+    #                 print("Not duplicate, appending to list")
+    #                 dup_block_list.append(boro_block_concat)
+    #     except Exception as e:
+    #         raise e
 
     EndTime = datetime.datetime.now().replace(microsecond=0)
     print("Script runtime: {}".format(EndTime - StartTime))
